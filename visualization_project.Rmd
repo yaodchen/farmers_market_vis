@@ -1,0 +1,209 @@
+---
+title: "IE6600 Section 36154 Project 1"
+output: pdf_document
+author: "Student Yaodong Chen"
+date : "02/22/2020"
+---
+
+Import data
+```{r}
+library(tidyverse)
+farmer <- read.csv("fmarket.csv", header = TRUE, na.strings = c("", "NA"))
+```
+
+
+Visual insights on the geographic
+```{r}
+library(plyr)
+library(dplyr)
+library(usmap)
+library(ggplot2)
+
+state <- data.frame(table(farmer$State))
+colnames(state) <- c("states", "numbers")
+state_count <- arrange(state, desc(state$numbers))
+
+### Bar plot for the data
+ggplot(data=state_count, aes(x=reorder(state_count$states, -state_count$numbers), y=state_count$numbers))+geom_bar(stat = "identity", fill="#F39C12")+
+  labs(x="States", y="Number of Markets", title="Number of Markets in US")+coord_flip()+
+  theme(plot.margin = unit(c(0.1,0.5,0.01,0.01),"cm"))
+```
+
+
+```{r}
+### US Map for the data
+map <- map_data("state")
+map$region <- tolower(map$region)
+state_count$states <- tolower(state_count$states)
+
+ggplot(state_count, aes(map_id = states)) +
+  geom_map(aes(fill=numbers), map=map,colour="grey",size = 0.5) +
+  expand_limits(x = map$long, y = map$lat) + 
+  labs(x="latitude", y="longitude", title="Market Number Distribution in the US") +
+  coord_quickmap()
+```
+
+
+
+```{r}
+library(usmap)
+library(ggplot2)
+library(dplyr)
+
+geo_info <- na.omit(select(farmer, x, y))
+colnames(geo_info) <- c("latitude", "longitude")
+
+usa<-map_data("state")
+gg1 <- ggplot()+geom_polygon(data=usa, aes(x=long,y=lat,group=group), color="grey", fill="NavyBlue")
+
+gg1 + geom_point(data=geo_info,aes(x=latitude, y=longitude),
+                        color="yellow", alpha=0.1, size=0.6) + 
+  labs(title="Geographic Distribution of the Markets in the US") +  
+  theme(panel.background = element_rect(color="black", fill="lightyellow"))+
+  coord_map()+
+  scale_x_continuous(name="latitude", limits = c(-130,-65))+
+  scale_y_continuous(name="longitude", limits = c(25,50))
+```
+
+
+Payment method of the farmers market in the US
+```{r}
+library(ggplot2)
+library(tidyverse) 
+
+payment <- select(farmer, 24:28)
+payment_count <- data.frame(apply(payment,2,function(x) sum(x=="Y")))
+payment_count <- rownames_to_column(payment_count)
+colnames(payment_count) <- c("payment", "count")
+
+payment_method <- c("Credit", "WIC", "WICcash", "SFMNP", "SNAP")
+final_chart <- data.frame(payment_method, count=payment_count$count)
+
+ggplot(final_chart, aes(x=payment_method, y=count))+geom_bar(stat = "identity",fill="#85C1E9")+
+  labs(x="Payment Method", y="Count", title="Total Number of Accepted Payment Methods in US")+
+  geom_text(aes(y=count,label=count+1))
+```
+
+Payment distribution using the Pie chart
+```{r}
+library(plotrix)
+par(mfrow=c(1,2))
+
+payment_method <- c("Credit", "WIC", "WICcash", "SFMNP", "SNAP")
+count<- payment_count$count
+  
+pct <- round(count/sum(count)*100)
+pct <- paste(pct,"%", sep = "")
+payment_method <- paste(pct, payment_method)
+
+pie(count, labels = payment_method, 
+    cex=0.7, 
+    col = rainbow(length(payment_method)), 
+    main = "Accepted Payment Pie Chart")
+
+pie3D(count, 
+      prob=TRUE, 
+      theta=1, 
+      labelcex=0.7, 
+      labels=payment_method, 
+      explode=0.25, 
+      main="3D Pie chart of Payment")
+```
+
+Geographic Distribution of the payment method of the markets in the US
+```{r}
+library(dplyr)
+library(ggplot2)
+library(usmap)
+
+usa<-map_data("state")
+gg1 <- ggplot()+geom_polygon(data=usa, aes(x=long,y=lat,group=group), color="grey", fill="NavyBlue")
+
+pay <- na.omit(select(farmer,x,y,Credit, WIC, WICcash, SFMNP, SNAP))
+all_pay <- filter(pay, Credit == "Y" & WIC == "Y" & WICcash == "Y" & SFMNP == "Y" & SNAP == "Y")
+none_pay <- filter(pay, Credit == "N" & WIC == "N" & WICcash == "N" & SFMNP == "N" & SNAP == "N")
+credit_only <-filter(pay, Credit == "Y" & WIC == "N" & WICcash == "N" & SFMNP == "N" & SNAP == "N")
+
+## all payments accepted
+gg1 + geom_point(data=all_pay,aes(x=x, y=y),
+                        color="#66FFCC", alpha=0.5, size=0.5) + 
+  labs(title="Markets that accept all payment methods in the US") +  
+  theme(panel.background = element_rect(color="black", fill="lightyellow"))+
+  coord_map()+
+  scale_x_continuous(name="latitude", limits = c(-130,-65))+
+  scale_y_continuous(name="longitude", limits = c(25,50))
+
+## no payment accepted
+gg1 + geom_point(data=none_pay,aes(x=x, y=y),
+                        color="#FFCC00", alpha=10.5, size=0.5) + 
+  labs(title="Markets that do not support any payment methods in the US") +  
+  theme(panel.background = element_rect(color="black", fill="lightyellow"))+
+  coord_map()+
+  scale_x_continuous(name="latitude", limits = c(-130,-65))+
+  scale_y_continuous(name="longitude", limits = c(25,50))
+
+## credit card payment only
+gg1 + geom_point(data=credit_only,aes(x=x, y=y),
+                        color="#FFCCFF", alpha=10.5, size=0.5) + 
+  labs(title="Markets that only support credit payment in the US") +  
+  theme(panel.background = element_rect(color="black", fill="lightyellow"))+
+  coord_map()+
+  scale_x_continuous(name="latitude", limits = c(-130,-65))+
+  scale_y_continuous(name="longitude", limits = c(25,50))
+
+```
+
+Products Distribution
+```{r}
+library(ggplot2)
+library(reshape2)
+library(tibble)
+
+product <- select(farmer, 29:58)
+product_count <- data.frame(apply(product,2,function(x) sum(x=="Y")))
+product_count <- rownames_to_column(product_count)
+colnames(product_count) <- c("product", "count")
+
+green <- product_count[1,2]+
+  product_count[9,2]+
+  product_count[23,2]+
+  product_count[24,2]+
+  product_count[27,2]+
+  product_count[29,2]+
+  product_count[14,2]+
+  product_count[30,2]+
+  product_count[28,2]
+
+dairy <- product_count[3,2]+product_count[11,2]
+
+meat <- product_count[7,2]+
+  product_count[27,2]+
+  product_count[6,2]+
+  product_count[13,2]+
+  product_count[15,2]
+
+grain <- product_count[2,2]+product_count[25,2]
+
+drink <- product_count[21,2]+product_count[22,2]+product_count[26,2]
+
+other <- product_count[4,2]+
+  product_count[5,2]+
+  product_count[12,2]+
+  product_count[20,2]+
+  product_count[8,2]+
+  product_count[18,2]+
+  product_count[28,2]+
+  product_count[10,2]+
+  product_count[16,2]
+
+product_kind <- c("drink", "meat", "dairy","other","green","grain")
+count=c(drink,meat,dairy,other,green,grain)
+product.df <- data.frame(product=product_kind, 
+                         count=count)
+
+ggplot(data=product.df, aes(x=product, y=count))+
+  geom_bar(stat = "identity", fill="#7D0552")+
+  labs(x="Product category",y="Number of markets", 
+       title="Market share in different categories in the US")
+```
+
